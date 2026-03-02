@@ -1,0 +1,52 @@
+# ============================================
+# Whisper Voice Input — Configuration
+# ============================================
+
+# Push-to-talk key (hold to record, release to transcribe)
+# Examples: "scroll lock", "pause", "f9", "right ctrl", "caps lock"
+hotkey: "f21"
+
+# Recognition language (ISO 639-1)
+# "auto" = auto-detect language (supports mixing Russian and English)
+# "ru" = force Russian, "en" = force English, etc.
+language: "auto"
+
+# Whisper model size
+# Options: tiny, base, small, medium, large-v3
+# Larger = better quality, more VRAM, slower first load
+# Recommended: "medium" for Russian (good balance)
+#              "large-v3" for best quality (needs ~3GB VRAM)
+model_size: "medium"
+
+# Compute device: "auto", "cuda", "cpu"
+# "auto" will use CUDA if available, otherwise CPU
+device: "auto"
+
+# Compute precision (affects speed and VRAM usage)
+# GPU: "float16" (fast, recommended), "int8_float16", "float32"
+# CPU: "int8" (fast), "float32"
+compute_type: "float16"
+
+# Beam size for decoding (higher = better quality, slower)
+beam_size: 5
+
+# Audio sample rate in Hz (16000 is optimal for Whisper)
+sample_rate: 16000
+
+# Minimum recording duration in seconds
+# Recordings shorter than this are skipped (accidental key press)
+min_duration: 0.5
+
+# Streaming transcription interval in seconds
+# Lower = more frequent updates but less accurate (Whisper needs context)
+# Higher = better accuracy, less frequent updates
+# Recommended: 2.0-3.0 for good accuracy, 1.0 for faster feedback
+stream_interval: 2.0
+
+# Sound feedback (beep on start/stop recording)
+sound_feedback: true
+
+# How to insert text into the active window
+# "clipboard" = Ctrl+V paste (recommended, works everywhere)
+# "typing" = type character-by-character (doesn't touch clipboard)
+insert_mode: "clipboard"
