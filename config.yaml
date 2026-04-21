@@ -1,28 +1,25 @@
 # ============================================
-# Whisper Voice Input — Configuration
+# Whisper Voice Input + Screen Capture — Config
 # ============================================
 
-# Push-to-talk key (hold to record, release to transcribe)
-# Examples: "scroll lock", "pause", "f9", "right ctrl", "caps lock"
+# ── Voice typing (push-to-talk) ──────────────
+# Hold to record, release to transcribe & paste.
 hotkey: "f21"
 
 # Recognition language (ISO 639-1)
-# "auto" = auto-detect language (supports mixing Russian and English)
-# "ru" = force Russian, "en" = force English, etc.
+# "auto" = auto-detect (supports mixed Russian/English),
+# "ru", "en", etc. = force a specific language.
 language: "auto"
 
 # Whisper model size
 # Options: tiny, base, small, medium, large-v3
 # Larger = better quality, more VRAM, slower first load
-# Recommended: "medium" for Russian (good balance)
-#              "large-v3" for best quality (needs ~3GB VRAM)
 model_size: "medium"
 
 # Compute device: "auto", "cuda", "cpu"
-# "auto" will use CUDA if available, otherwise CPU
 device: "auto"
 
-# Compute precision (affects speed and VRAM usage)
+# Compute precision
 # GPU: "float16" (fast, recommended), "int8_float16", "float32"
 # CPU: "int8" (fast), "float32"
 compute_type: "float16"
@@ -33,20 +30,37 @@ beam_size: 5
 # Audio sample rate in Hz (16000 is optimal for Whisper)
 sample_rate: 16000
 
-# Minimum recording duration in seconds
-# Recordings shorter than this are skipped (accidental key press)
+# Minimum recording duration in seconds (skips accidental taps)
 min_duration: 0.5
 
 # Streaming transcription interval in seconds
-# Lower = more frequent updates but less accurate (Whisper needs context)
-# Higher = better accuracy, less frequent updates
-# Recommended: 2.0-3.0 for good accuracy, 1.0 for faster feedback
 stream_interval: 2.0
 
-# Sound feedback (beep on start/stop recording)
+# Beep on recording start/stop
 sound_feedback: true
 
-# How to insert text into the active window
-# "clipboard" = Ctrl+V paste (recommended, works everywhere)
-# "typing" = type character-by-character (doesn't touch clipboard)
+# Text insertion method: "clipboard" (Shift+Insert) or "typing"
 insert_mode: "clipboard"
+
+
+# ── Screen capture ───────────────────────────
+# Independent hotkeys for video (toggle) and screenshot (tap).
+# Must not collide with the voice hotkey above.
+screen:
+  enabled: true
+
+  # Tap once to pick a region and start recording, tap again to stop.
+  # Saves GIF + MP4 + labeled PNG frame grid into its own folder.
+  video_hotkey: "f20"
+
+  # Tap once, select a region on a frozen snapshot of the primary
+  # monitor — any open dropdown/menu stays visible in the picker.
+  # Saves a single PNG.
+  screenshot_hotkey: "f17"
+
+  # Video frames per second (higher = smoother + larger files).
+  video_fps: 15
+
+  # Where all captures go. Each capture gets its own timestamped
+  # subfolder; activity.log lives directly in output_dir.
+  output_dir: "~/Documents/records"

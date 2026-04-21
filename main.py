@@ -1,10 +1,18 @@
-"""Whisper Voice Input — system-wide push-to-talk voice typing.
+"""Whisper Voice Input + Screen Capture — unified system-wide hotkeys.
 
-Hold the configured hotkey, speak in Russian, release — text is pasted
-into the active window (terminal, editor, browser, etc.).
+Voice (push-to-talk):
+    Hold   F21 (default) — speak — release: transcription pasted & copied.
+
+Screen capture (tap-to-toggle):
+    Tap    F20 — select region, tap F20 again — GIF + MP4 + frame grid saved.
+    Tap    F17 — select region on a frozen snapshot (keeps dropdowns visible)
+                  — PNG screenshot saved.
+
+Every event is appended to <screen.output_dir>/activity.log so you can
+review your day at a glance.
 
 Usage:
-    python main.py              # Use config.yaml
+    python main.py                         # use config.yaml
     python main.py --config my_config.yaml
 """
 
@@ -29,6 +37,20 @@ import threading
 import time
 import winsound
 from datetime import datetime
+from pathlib import Path
+
+# Per-monitor DPI awareness: Tk reports physical pixel coords that
+# match mss.grab() — required for correct region selection under
+# Windows display scaling.
+if sys.platform == "win32":
+    try:
+        import ctypes
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
 
 from colorama import Fore, Style, init as colorama_init
 
@@ -37,6 +59,8 @@ from app.recorder import AudioRecorder
 from app.transcriber import Transcriber
 from app.inserter import TextInserter
 from app.hotkey import HotkeyManager
+from app.activity_log import get_logger
+from app.screen import ScreenController
 
 
 # ── UI helpers ──────────────────────────────────────────────────────────────
@@ -52,40 +76,42 @@ def print_status(msg: str, color: str = Fore.WHITE) -> None:
 def print_banner(config: Config, device: str) -> None:
     gpu_icon = "✓ CUDA" if device == "cuda" else "CPU"
     print()
-    print(f"  {Fore.CYAN}{'═' * 50}{Style.RESET_ALL}")
-    print(f"  {Fore.CYAN}  Whisper Voice Input{Style.RESET_ALL}")
-    print(f"  {Fore.CYAN}{'─' * 50}{Style.RESET_ALL}")
-    print(f"    Model    : {Fore.YELLOW}{config.model_size}{Style.RESET_ALL}")
-    print(f"    Language : {Fore.YELLOW}{config.language}{Style.RESET_ALL}")
-    print(f"    Device   : {Fore.YELLOW}{gpu_icon}{Style.RESET_ALL}")
-    print(f"    Hotkey   : {Fore.GREEN}{config.hotkey.upper()}{Style.RESET_ALL} (hold to record)")
-    print(f"  {Fore.CYAN}{'─' * 50}{Style.RESET_ALL}")
-    print(f"    Hold [{Fore.GREEN}{config.hotkey.upper()}{Style.RESET_ALL}] and speak, release to transcribe.")
+    print(f"  {Fore.CYAN}{'═' * 60}{Style.RESET_ALL}")
+    print(f"  {Fore.CYAN}  Whisper Voice Input + Screen Capture{Style.RESET_ALL}")
+    print(f"  {Fore.CYAN}{'─' * 60}{Style.RESET_ALL}")
+    print(f"    Model          : {Fore.YELLOW}{config.model_size}{Style.RESET_ALL}")
+    print(f"    Language       : {Fore.YELLOW}{config.language}{Style.RESET_ALL}")
+    print(f"    Device         : {Fore.YELLOW}{gpu_icon}{Style.RESET_ALL}")
+    print(f"    Voice hotkey   : {Fore.GREEN}{config.hotkey.upper()}{Style.RESET_ALL} (hold to record)")
+    if config.screen.enabled:
+        print(f"    Video hotkey   : {Fore.GREEN}{config.screen.video_hotkey.upper()}{Style.RESET_ALL} (tap to toggle)")
+        print(f"    Shot hotkey    : {Fore.GREEN}{config.screen.screenshot_hotkey.upper()}{Style.RESET_ALL} (tap)")
+        print(f"    Output dir     : {Fore.YELLOW}{Path(config.screen.output_dir).expanduser()}{Style.RESET_ALL}")
+    else:
+        print(f"    Screen capture : {Fore.YELLOW}disabled{Style.RESET_ALL}")
+    print(f"  {Fore.CYAN}{'─' * 60}{Style.RESET_ALL}")
     print(f"    Press {Fore.RED}Ctrl+C{Style.RESET_ALL} to exit.")
-    print(f"  {Fore.CYAN}{'═' * 50}{Style.RESET_ALL}")
+    print(f"  {Fore.CYAN}{'═' * 60}{Style.RESET_ALL}")
     print()
 
 
-# ── Beep feedback ───────────────────────────────────────────────────────────
+# ── Voice beeps ─────────────────────────────────────────────────────────────
 
-def beep_start() -> None:
-    """Short high beep — recording started."""
+def voice_beep_start():
     try:
         winsound.Beep(800, 150)
     except Exception:
         pass
 
 
-def beep_stop() -> None:
-    """Short low beep — recording stopped."""
+def voice_beep_stop():
     try:
         winsound.Beep(400, 150)
     except Exception:
         pass
 
 
-def beep_error() -> None:
-    """Two short beeps — error."""
+def voice_beep_error():
     try:
         winsound.Beep(300, 100)
         winsound.Beep(300, 100)
@@ -96,11 +122,15 @@ def beep_error() -> None:
 # ── Main application ────────────────────────────────────────────────────────
 
 class App:
-
     def __init__(self, config: Config):
         self.config = config
         self.device = config.effective_device
-        self.recorder = AudioRecorder(sample_rate=config.sample_rate)
+
+        # Shared file logger — voice + screen events in one place.
+        self.log = get_logger(Path(config.screen.output_dir).expanduser())
+
+        # Voice subsystem
+        self.audio_recorder = AudioRecorder(sample_rate=config.sample_rate)
         self.transcriber = Transcriber(
             model_size=config.model_size,
             device=self.device,
@@ -109,28 +139,55 @@ class App:
             language=config.language,
         )
         self.inserter = TextInserter(mode=config.insert_mode)
-        self.hotkey_mgr = HotkeyManager(
-            hotkey=config.hotkey,
-            on_press=self._on_key_press,
-            on_release=self._on_key_release,
-            on_tick=self.inserter.poll_and_paste,
+
+        # Screen subsystem (optional)
+        self.screen: ScreenController | None = None
+        if config.screen.enabled:
+            self.screen = ScreenController(config.screen, self.log)
+
+        # Unified hotkey manager
+        self.hotkey_mgr = HotkeyManager()
+        self.hotkey_mgr.add_hold(
+            config.hotkey,
+            on_press=self._on_voice_press,
+            on_release=self._on_voice_release,
         )
+        if self.screen is not None:
+            self.hotkey_mgr.add_toggle(
+                config.screen.video_hotkey, self.screen.post_video_toggle,
+            )
+            self.hotkey_mgr.add_toggle(
+                config.screen.screenshot_hotkey, self.screen.post_screenshot,
+            )
+        self.hotkey_mgr.set_tick(self.inserter.poll_and_paste)
+
         self._processing = False
         self._recording = False
         self._lock = threading.Lock()
 
     def run(self) -> None:
-        """Start the application."""
         colorama_init()
 
         print_status(
-            f"Loading Whisper model '{self.config.model_size}'... (first run downloads ~1-3 GB)",
+            f"Loading Whisper model '{self.config.model_size}'... "
+            "(first run downloads ~1-3 GB)",
             Fore.YELLOW,
         )
-        self.transcriber.load_model(on_progress=lambda msg: print_status(msg, Fore.YELLOW))
+        self.transcriber.load_model(
+            on_progress=lambda msg: print_status(msg, Fore.YELLOW)
+        )
         print_status("Model ready!", Fore.GREEN)
 
+        if self.screen is not None:
+            self.screen.start()
+
         print_banner(self.config, self.device)
+        self.log.info(
+            "READY        | voice=%s video=%s shot=%s",
+            self.config.hotkey,
+            self.config.screen.video_hotkey if self.screen else "-",
+            self.config.screen.screenshot_hotkey if self.screen else "-",
+        )
 
         self.hotkey_mgr.start()
         print_status("Listening...", Fore.GREEN)
@@ -144,88 +201,95 @@ class App:
             print_status("Shutting down...", Fore.YELLOW)
             self.hotkey_mgr.stop()
             self.inserter.shutdown()
+            if self.screen is not None:
+                self.screen.stop()
+            self.log.info("EXIT         | shutdown")
             print_status("Bye!", Fore.CYAN)
 
-    def _on_key_press(self) -> None:
-        """Called when push-to-talk key is pressed."""
+    # ── Voice callbacks ───────────────────────────────────────────────
+    def _on_voice_press(self) -> None:
         with self._lock:
             if self._processing or self._recording:
                 return
             self._recording = True
 
         self.inserter.capture_target_window()
-        self.recorder.start()
+        self.audio_recorder.start()
 
         if self.config.sound_feedback:
-            threading.Thread(target=beep_start, daemon=True).start()
+            threading.Thread(target=voice_beep_start, daemon=True).start()
 
         print_status(f"{Fore.RED}● Recording...{Style.RESET_ALL}")
 
-    def _on_key_release(self) -> None:
-        """Called when push-to-talk key is released."""
+    def _on_voice_release(self) -> None:
         with self._lock:
             if not self._recording:
                 return
             self._recording = False
 
         if self.config.sound_feedback:
-            threading.Thread(target=beep_stop, daemon=True).start()
+            threading.Thread(target=voice_beep_stop, daemon=True).start()
 
-        # Final transcription in background
-        threading.Thread(target=self._finalize, daemon=True).start()
+        threading.Thread(target=self._finalize_voice, daemon=True).start()
 
-    def _finalize(self) -> None:
-        """Stop recording, transcribe full audio, paste result."""
+    def _finalize_voice(self) -> None:
         with self._lock:
             self._processing = True
-
         try:
-            audio = self.recorder.stop()
-
+            audio = self.audio_recorder.stop()
             if audio is None:
                 print_status("No audio captured.", Fore.YELLOW)
+                self.log.info("VOICE_EMPTY  | no audio captured")
                 return
 
             duration = len(audio) / self.config.sample_rate
             if duration < self.config.min_duration:
-                print_status(
-                    f"Too short ({duration:.1f}s), skipped.", Fore.YELLOW
-                )
+                print_status(f"Too short ({duration:.1f}s), skipped.", Fore.YELLOW)
+                self.log.info("VOICE_SKIP   | duration=%.2fs (below min)", duration)
                 return
 
             print_status(
                 f"{Fore.YELLOW}◆ Transcribing ({duration:.1f}s)...{Style.RESET_ALL}"
             )
             start = time.perf_counter()
-            full_text = self.transcriber.transcribe(audio)
+            text = self.transcriber.transcribe(audio)
             elapsed = time.perf_counter() - start
 
-            if full_text:
-                self.inserter.paste(full_text)
-                self.inserter.copy_to_clipboard(full_text)
+            if text:
+                self.inserter.paste(text)
+                self.inserter.copy_to_clipboard(text)
                 print_status(
-                    f'{Fore.GREEN}✓{Style.RESET_ALL} "{Fore.WHITE}{full_text}{Style.RESET_ALL}" '
-                    f'({elapsed:.1f}s) — pasted & copied to clipboard',
+                    f'{Fore.GREEN}✓{Style.RESET_ALL} '
+                    f'"{Fore.WHITE}{text}{Style.RESET_ALL}" '
+                    f'({elapsed:.1f}s) — pasted & copied',
+                )
+                self.log.info(
+                    "VOICE_OK     | duration=%.2fs elapsed=%.2fs text=%r",
+                    duration, elapsed, text,
                 )
             else:
                 print_status("Nothing recognized.", Fore.YELLOW)
+                self.log.info("VOICE_EMPTY  | nothing recognized")
 
         except Exception as e:
             print_status(f"Transcription error: {e}", Fore.RED)
+            self.log.error("VOICE_ERROR  | %s", e)
             if self.config.sound_feedback:
-                beep_error()
+                voice_beep_error()
 
         finally:
             with self._lock:
                 self._processing = False
 
+
 # ── Entry point ─────────────────────────────────────────────────────────────
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Whisper Voice Input")
+    parser = argparse.ArgumentParser(
+        description="Whisper Voice Input + Screen Capture"
+    )
     parser.add_argument(
-        "--config",
-        default="config.yaml",
+        "--config", default="config.yaml",
         help="Path to configuration file (default: config.yaml)",
     )
     args = parser.parse_args()

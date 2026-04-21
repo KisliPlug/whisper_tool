@@ -1,7 +1,12 @@
 faster-whisper>=1.1.0
 sounddevice>=0.5.0
 numpy>=1.26.0
-keyboard>=0.13.5
 pyperclip>=1.9.0
 PyYAML>=6.0
 colorama>=0.4.6
+
+# Screen capture
+mss>=9.0.1
+Pillow>=10.0
+imageio>=2.31
+imageio-ffmpeg>=0.4.9
