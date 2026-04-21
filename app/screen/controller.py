@@ -1,13 +1,20 @@
 """Screen capture controller — serial state machine for video + screenshot.
 
-Hotkey handlers post events (`post_video_toggle`, `post_screenshot`) onto
-the controller's queue; a dedicated worker thread drains the queue and
-owns all Tk windows (selection overlay, border indicator) so Tk only
-touches one thread at a time.
+Owns a single, long-lived Tk root that lives for the entire lifetime of
+the worker thread. `select_region` and `BorderIndicator` place Toplevel
+widgets on this root — NEVER their own Tk() — so all Tk operations
+stay on one thread. Cross-thread Tk usage triggers
+"Tcl_AsyncDelete: async handler deleted by the wrong thread" panics.
+
+External callers (hotkey handlers) enqueue events via
+`post_video_toggle()` / `post_screenshot()`; the worker thread drains
+the queue, pumping Tk's event loop between events so border windows
+stay responsive.
 """
 
 import queue
 import threading
+import tkinter as tk
 from datetime import datetime
 from pathlib import Path
 
@@ -28,17 +35,21 @@ class ScreenController:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._events: queue.Queue = queue.Queue()
         self._worker = None
+        self._running = False
+        self._root: tk.Tk | None = None
         self._state = "idle"  # or "recording_video"
         self._recorder = None
-        self._indicator = None
+        self._border: BorderIndicator | None = None
         self._rec_region = None
 
     # ── Public API ────────────────────────────────────────────────────
     def start(self):
+        self._running = True
         self._worker = threading.Thread(target=self._run, daemon=True)
         self._worker.start()
 
     def stop(self):
+        self._running = False
         self._events.put("__shutdown__")
         if self._worker is not None:
             self._worker.join(timeout=5.0)
@@ -51,42 +62,70 @@ class ScreenController:
 
     # ── Worker loop ───────────────────────────────────────────────────
     def _run(self):
-        while True:
+        self._root = tk.Tk()
+        self._root.withdraw()
+        try:
+            while self._running:
+                try:
+                    ev = self._events.get(timeout=0.1)
+                except queue.Empty:
+                    self._pump()
+                    continue
+                if ev == "__shutdown__":
+                    if self._state == "recording_video":
+                        try:
+                            self._finish_video()
+                        except Exception as e:
+                            self.log.error(
+                                "VIDEO_ERROR  | shutdown cleanup failed: %s", e
+                            )
+                    break
+                try:
+                    if ev == "video":
+                        self._handle_video()
+                    elif ev == "screenshot":
+                        self._handle_screenshot()
+                except Exception as e:
+                    tag = "VIDEO_ERROR  " if ev == "video" else "SHOT_ERROR   "
+                    self.log.error("%s| %s", tag, e)
+                    if ev == "video":
+                        self._state = "idle"
+                self._pump()
+        finally:
+            if self._border is not None:
+                try:
+                    self._border.hide()
+                except Exception:
+                    pass
+                self._border = None
             try:
-                ev = self._events.get(timeout=0.2)
-            except queue.Empty:
-                continue
-            if ev == "__shutdown__":
-                if self._state == "recording_video":
-                    try:
-                        self._finish_video()
-                    except Exception as e:
-                        self.log.error("VIDEO_ERROR  | shutdown cleanup failed: %s", e)
-                return
-            if ev == "video":
-                try:
-                    self._handle_video()
-                except Exception as e:
-                    self.log.error("VIDEO_ERROR  | %s", e)
-                    self._state = "idle"
-            elif ev == "screenshot":
-                try:
-                    self._handle_screenshot()
-                except Exception as e:
-                    self.log.error("SHOT_ERROR   | %s", e)
+                if self._root is not None:
+                    self._root.destroy()
+            except Exception:
+                pass
+            self._root = None
+
+    def _pump(self):
+        """Process any pending Tk events (WM_PAINT, etc.) without blocking."""
+        if self._root is None:
+            return
+        try:
+            self._root.update()
+        except Exception:
+            pass
 
     # ── Video ─────────────────────────────────────────────────────────
     def _handle_video(self):
         if self._state == "idle":
-            region = select_region()
+            region = select_region(self._root)
             if region is None:
                 self.log.info("VIDEO_CANCEL | selection aborted")
                 return
             self._rec_region = region
             self._recorder = VideoRecorder(region, fps=self.config.video_fps)
             self._recorder.start()
-            self._indicator = BorderIndicator(region)
-            self._indicator.start()
+            self._border = BorderIndicator(self._root, region)
+            self._border.show()
             sounds.video_start()
             self._state = "recording_video"
             self.log.info(
@@ -98,9 +137,9 @@ class ScreenController:
 
     def _finish_video(self):
         sounds.video_stop()
-        if self._indicator is not None:
-            self._indicator.stop()
-            self._indicator = None
+        if self._border is not None:
+            self._border.hide()
+            self._border = None
         frames, fps = self._recorder.stop()
         self._recorder = None
         self._state = "idle"
@@ -121,7 +160,7 @@ class ScreenController:
         except Exception as e:
             clip_note = f" (clipboard failed: {e})"
         self.log.info(
-            "VIDEO_SAVED  | frames=%d duration=%.2fs region=%dx%d path=%s%s",
+            "VIDEO_END    | frames=%d duration=%.2fs region=%dx%d path=%s%s",
             len(frames), duration,
             self._rec_region[2], self._rec_region[3], out_dir, clip_note,
         )
@@ -132,12 +171,13 @@ class ScreenController:
         if self._state != "idle":
             self.log.info("SHOT_IGNORED | video recording in progress")
             return
+        self.log.info("SHOT_START   | hotkey pressed, capturing frozen snapshot")
         try:
             frozen, mon = capture_primary_screen()
         except Exception as e:
             self.log.error("SHOT_ERROR   | capture failed: %s", e)
             return
-        region = select_region(frozen_image=frozen, monitor=mon)
+        region = select_region(self._root, frozen_image=frozen, monitor=mon)
         if region is None:
             self.log.info("SHOT_CANCEL  | selection aborted")
             return
@@ -165,6 +205,6 @@ class ScreenController:
         except Exception as e:
             clip_note = f" (clipboard failed: {e})"
         self.log.info(
-            "SHOT_SAVED   | region=%dx%d file=%s%s",
+            "SHOT_END     | region=%dx%d file=%s%s",
             region[2], region[3], png_path, clip_note,
         )

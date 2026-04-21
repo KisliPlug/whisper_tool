@@ -1,9 +1,15 @@
 """Two-point area selection overlay + primary-monitor snapshot helper.
 
+Tk usage is parent-driven: the caller passes in a long-lived Tk root
+and the overlay is created as a Toplevel on it, then dismissed via
+wait_window(). This keeps every Tk operation on a single thread —
+running multiple Tk() instances across threads in one process trips
+"Tcl_AsyncDelete: async handler deleted by the wrong thread".
+
 Two flavours of overlay:
-  * live (for video): translucent dim overlay over the actual desktop.
-  * frozen (for screenshot): displays a pre-captured snapshot of the
-    primary monitor, so transient UI (dropdowns, tooltips, menus) stays
+  * live (for video): translucent dim over the live desktop.
+  * frozen (for screenshot): a pre-captured snapshot of the primary
+    monitor, so transient UI (dropdowns, tooltips, menus) stays
     visible in the picker even though opening the overlay stole focus.
 """
 
@@ -23,27 +29,27 @@ def capture_primary_screen():
     return rgb, dict(mon)
 
 
-def select_region(frozen_image=None, monitor=None):
-    """Show a fullscreen overlay for two-point selection.
+def select_region(root, frozen_image=None, monitor=None):
+    """Show a Toplevel overlay for two-point selection on the given root.
 
     Returns (x, y, w, h) in absolute screen pixels, or None if cancelled.
     """
-    root = tk.Tk()
+    win = tk.Toplevel(root)
     if monitor is not None:
-        root.geometry(
+        win.geometry(
             f"{monitor['width']}x{monitor['height']}"
             f"+{monitor['left']}+{monitor['top']}"
         )
-    root.attributes("-fullscreen", True)
-    root.attributes("-topmost", True)
-    root.config(cursor="crosshair")
+    win.attributes("-fullscreen", True)
+    win.attributes("-topmost", True)
+    win.config(cursor="crosshair")
 
     if frozen_image is not None:
-        root.attributes("-alpha", 1.0)
-        canvas = tk.Canvas(root, bg="black", highlightthickness=0)
+        win.attributes("-alpha", 1.0)
+        canvas = tk.Canvas(win, bg="black", highlightthickness=0)
         canvas.pack(fill="both", expand=True)
         bg_pil = Image.fromarray(frozen_image)
-        bg_photo = ImageTk.PhotoImage(bg_pil)
+        bg_photo = ImageTk.PhotoImage(bg_pil, master=win)
         canvas._bg_photo_ref = bg_photo  # prevent GC
         canvas.create_image(0, 0, anchor="nw", image=bg_photo)
         h_img, w_img = frozen_image.shape[:2]
@@ -53,8 +59,8 @@ def select_region(frozen_image=None, monitor=None):
         )
         info_text = "Frozen screen — click two corner points (Esc to cancel)"
     else:
-        root.attributes("-alpha", 0.55)
-        canvas = tk.Canvas(root, bg="gray15", highlightthickness=0)
+        win.attributes("-alpha", 0.55)
+        canvas = tk.Canvas(win, bg="gray15", highlightthickness=0)
         canvas.pack(fill="both", expand=True)
         info_text = "Click two corner points (Esc to cancel)"
 
@@ -82,7 +88,7 @@ def select_region(frozen_image=None, monitor=None):
             )
         elif len(state["canvas_points"]) == 2:
             state["ok"] = True
-            root.after(10, root.destroy)
+            win.after(10, win.destroy)
 
     def on_motion(e):
         if len(state["canvas_points"]) == 1 and state["rect"] is not None:
@@ -92,12 +98,22 @@ def select_region(frozen_image=None, monitor=None):
 
     def on_escape(_):
         state["ok"] = False
-        root.destroy()
+        win.destroy()
 
-    root.bind("<Button-1>", on_click)
-    root.bind("<Motion>", on_motion)
-    root.bind("<Escape>", on_escape)
-    root.mainloop()
+    win.bind("<Button-1>", on_click)
+    win.bind("<Motion>", on_motion)
+    win.bind("<Escape>", on_escape)
+    win.grab_set()
+    win.focus_force()
+    root.wait_window(win)
+
+    # Drop the PhotoImage reference explicitly — otherwise it may live
+    # on via canvas._bg_photo_ref attached to a dead widget and get GC'd
+    # later on a different thread.
+    try:
+        canvas._bg_photo_ref = None
+    except Exception:
+        pass
 
     if not state["ok"] or len(state["screen_points"]) != 2:
         return None
