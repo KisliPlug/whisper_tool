@@ -41,3 +41,7 @@ Desktop.ini
 
 # Logs
 *.log
+
+# Node / Electron annotator
+node_modules/
+npm-debug.log*

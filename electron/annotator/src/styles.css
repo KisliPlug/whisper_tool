@@ -1,0 +1,979 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  color: #25211b;
+  background: #ece8df;
+  font-family: "Segoe UI", Inter, system-ui, sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  user-select: none;
+}
+
+.loading {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  color: #4d463b;
+  background: #ece8df;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 1fr;
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  overflow: auto;
+  background: #f7f4ee;
+  border-right: 1px solid #d8d1c5;
+}
+
+.brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 4px 2px 8px;
+}
+
+.brandMark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: #fffdf7;
+  background: #2c7a7b;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(44, 122, 123, 0.22);
+}
+
+.brandTitle {
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.brandSub,
+.hint {
+  color: #766f64;
+  font-size: 12px;
+}
+
+.panel {
+  padding: 10px;
+  background: #fffdf8;
+  border: 1px solid #ddd6ca;
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(69, 57, 39, 0.05);
+}
+
+.panelTitle {
+  margin-bottom: 8px;
+  color: #6e6253;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.currentToolPanel {
+  border-color: #c9d6d4;
+  background: #f7fbf9;
+}
+
+.wideButton,
+.ghostButton,
+.saveButton,
+.noteAdd,
+.iconButton,
+.zoomReadout,
+.noteIcon,
+.noteNameButton {
+  color: #2c251c;
+  background: #fffaf1;
+  border: 1px solid #d9d0c2;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.wideButton:hover,
+.ghostButton:hover,
+.saveButton:hover,
+.noteAdd:hover,
+.iconButton:hover,
+.zoomReadout:hover,
+.noteIcon:hover,
+.noteNameButton:hover {
+  border-color: #b8aa98;
+  background: #fff4df;
+}
+
+.wideButton.enabled,
+.noteIcon.active {
+  color: #133c3d;
+  background: #dff1ee;
+  border-color: #76aaa7;
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.swatch {
+  height: 24px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+
+.swatch.active {
+  border-color: #fffdf8;
+  box-shadow: 0 0 0 2px #2c7a7b, inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+.rangeLabel {
+  display: block;
+  margin: 8px 0 4px;
+  color: #665d51;
+  font-size: 12px;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: #2c7a7b;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 7px;
+}
+
+.wideButton {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 10px;
+}
+
+.currentToolPanel .wideButton {
+  justify-content: center;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.iconButton {
+  display: grid;
+  width: 36px;
+  height: 34px;
+  place-items: center;
+}
+
+.zoomReadout {
+  min-width: 58px;
+  height: 34px;
+}
+
+.iconButton:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.workspace {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  min-height: 0;
+  background:
+    linear-gradient(0deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.52)),
+    #e7e1d6;
+}
+
+.topbar {
+  display: grid;
+  grid-template-columns: minmax(170px, auto) minmax(116px, auto) minmax(110px, 180px) minmax(220px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(255, 253, 248, 0.96);
+  border-bottom: 1px solid #d8d1c5;
+}
+
+.brandCompact {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.noteDock {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  max-width: 300px;
+  overflow: auto;
+}
+
+.noteIcon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.noteIcon.active {
+  box-shadow: inset 0 -2px 0 #2c7a7b;
+}
+
+.noteAdd {
+  display: grid;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+}
+
+.noteMeta {
+  min-width: 0;
+}
+
+.noteNameButton,
+.noteNameInput {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.noteNameButton {
+  font-weight: 700;
+}
+
+.noteNameInput {
+  color: #242019;
+  background: #fffdf8;
+  border: 1px solid #76aaa7;
+  border-radius: 7px;
+  outline: none;
+}
+
+.noteText {
+  width: 100%;
+  height: 42px;
+  padding: 7px 10px;
+  color: #2a241c;
+  resize: none;
+  background: #fffdf8;
+  border: 1px solid #d9d0c2;
+  border-radius: 8px;
+  outline: none;
+}
+
+.noteText:focus {
+  border-color: #2c7a7b;
+  box-shadow: 0 0 0 3px rgba(44, 122, 123, 0.12);
+}
+
+.topActions {
+  display: flex;
+  gap: 8px;
+}
+
+.ghostButton,
+.saveButton,
+.toolPill {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  min-height: 36px;
+  padding: 8px 11px;
+}
+
+.toolPill {
+  color: #143f40;
+  font-weight: 750;
+  background: #dff1ee;
+  border: 1px solid #79aaa7;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.saveButton {
+  color: #fffdf8;
+  background: #2f7d54;
+  border-color: #2b6f4b;
+}
+
+.saveButton:hover {
+  color: #fffdf8;
+  background: #286b48;
+  border-color: #245f41;
+}
+
+.stageScroller {
+  min-width: 0;
+  min-height: 0;
+  padding: 18px;
+  overflow: auto;
+  cursor: default;
+  overscroll-behavior: contain;
+}
+
+.stageScroller.panning,
+.stageScroller.panning * {
+  cursor: grabbing !important;
+}
+
+.stage {
+  position: relative;
+  flex: 0 0 auto;
+  margin: auto;
+  background: #fdfbf6;
+  box-shadow: 0 18px 48px rgba(64, 52, 36, 0.26);
+  user-select: none;
+}
+
+.stage.tool-select {
+  cursor: default;
+}
+
+.stage.tool-pen,
+.stage.tool-line,
+.stage.tool-arrow,
+.stage.tool-rect,
+.stage.tool-ellipse {
+  cursor: crosshair;
+}
+
+.stage.tool-text {
+  cursor: text;
+}
+
+.baseImage,
+.overlay,
+.gridOverlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.baseImage {
+  object-fit: contain;
+}
+
+.overlay,
+.gridOverlay {
+  overflow: visible;
+}
+
+.gridOverlay {
+  pointer-events: none;
+}
+
+.gridOverlay line {
+  stroke: rgba(44, 122, 123, 0.15);
+  stroke-width: 1;
+}
+
+.selection {
+  pointer-events: none;
+}
+
+.selection > rect:first-child {
+  fill: none;
+  stroke: #1f6f70;
+  stroke-width: 1.2;
+  stroke-dasharray: 7 5;
+}
+
+.selection > rect:not(:first-child) {
+  fill: #fffdf8;
+  stroke: #1f6f70;
+  stroke-width: 1;
+}
+
+.groupSelection {
+  fill: rgba(44, 122, 123, 0.05);
+  stroke: #1f6f70;
+  stroke-width: 1.5;
+  stroke-dasharray: 10 6;
+  pointer-events: none;
+}
+
+.marquee {
+  fill: rgba(44, 122, 123, 0.14);
+  stroke: #2c7a7b;
+  stroke-width: 1.3;
+  stroke-dasharray: 8 5;
+  pointer-events: none;
+}
+
+.inlineText {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  padding: 0;
+  overflow: visible;
+  color: currentColor;
+  line-height: 1.25;
+  resize: none;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.45);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.inlineText::placeholder {
+  color: currentColor;
+  opacity: 0.55;
+}
+
+.inlineText.selected {
+  caret-color: currentColor;
+}
+
+.radialHost {
+  position: fixed;
+  z-index: 1000;
+  width: 244px;
+  height: 244px;
+  pointer-events: auto;
+  filter: drop-shadow(0 18px 30px rgba(55, 45, 30, 0.2));
+}
+
+.radialHostSettings {
+  width: 340px;
+  height: 340px;
+}
+
+.radialHost::before {
+  position: absolute;
+  inset: 22px;
+  content: "";
+  background: rgba(255, 253, 248, 0.78);
+  border: 1px solid rgba(140, 128, 111, 0.35);
+  border-radius: 50%;
+  backdrop-filter: blur(14px);
+}
+
+.radialHostSettings::before {
+  inset: 0;
+  background: rgba(255, 253, 248, 0.84);
+}
+
+.radialCore {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  width: 90px;
+  height: 90px;
+  place-items: center;
+  padding: 18px 8px 14px;
+  color: #123d3d;
+  text-align: center;
+  background: #e2f2ef;
+  border: 1px solid #79aaa7;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.radialCoreButton {
+  cursor: pointer;
+}
+
+.radialCoreButton:hover {
+  color: #fffdf8;
+  background: #2c7a7b;
+  border-color: #24696a;
+}
+
+.radialCenterMenu {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: 98px;
+  height: 98px;
+  overflow: hidden;
+  background: #fffdf8;
+  border: 1px solid #79aaa7;
+  border-radius: 50%;
+  box-shadow: 0 8px 20px rgba(61, 49, 34, 0.12);
+  transform: translate(-50%, -50%);
+}
+
+.radialCollapseDot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 4;
+  display: grid;
+  width: 50px;
+  height: 50px;
+  place-items: center;
+  color: #ffffff;
+  background: #070707;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: 0 5px 14px rgba(20, 20, 20, 0.28);
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+}
+
+.radialCollapseDot:hover {
+  background: #1f1f1f;
+}
+
+.radialSegment {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  padding: 4px;
+  color: #174243;
+  font-size: 10px;
+  font-weight: 750;
+  background: #edf8f6;
+  border: 0;
+  cursor: pointer;
+}
+
+.radialSegment:hover,
+.radialSegment.active {
+  color: #fffdf8;
+  background: #2c7a7b;
+}
+
+.segmentTools {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 50%;
+  border-bottom: 1px solid rgba(44, 122, 123, 0.22);
+}
+
+.segmentColors {
+  left: 0;
+  bottom: 0;
+  width: 50%;
+  height: 50%;
+  border-right: 1px solid rgba(44, 122, 123, 0.22);
+}
+
+.segmentSettings {
+  right: 0;
+  bottom: 0;
+  width: 50%;
+  height: 50%;
+}
+
+.activeColorDot {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(55, 45, 30, 0.22);
+}
+
+.radialTitle {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.radialSub {
+  color: #52706d;
+  font-size: 10px;
+}
+
+.radialItem {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  color: #42382d;
+  background: #fffdf8;
+  border: 1px solid #d8d0c5;
+  border-radius: 50%;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+}
+
+.toolShortcut {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  color: #fffdf8;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 15px;
+  text-align: center;
+  background: #2c7a7b;
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  opacity: 0.74;
+}
+
+.radialItem:hover .toolShortcut,
+.radialItem.hover .toolShortcut {
+  opacity: 1;
+}
+
+.radialItem.active {
+  color: #143f40;
+  background: #dff1ee;
+  border-color: #79aaa7;
+}
+
+.radialItem.hover {
+  color: #fffdf8;
+  background: #2c7a7b;
+  border-color: #24696a;
+  transform: translate(-50%, -50%) scale(1.12);
+}
+
+.radialItem.colorWheelSwatch {
+  color: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(71, 59, 42, 0.24);
+}
+
+.radialItem.colorWheelSwatch.active {
+  box-shadow: 0 0 0 3px #2c7a7b, 0 0 0 5px #fffdf8;
+}
+
+.settingsOrbit {
+  position: absolute;
+  inset: 28px;
+  border: 1px dashed rgba(44, 122, 123, 0.28);
+  border-radius: 50%;
+}
+
+.settingsCenter {
+  position: absolute;
+  left: 50%;
+  top: 45px;
+  display: grid;
+  width: 68px;
+  height: 68px;
+  place-items: center;
+  color: #143f40;
+  font-size: 11px;
+  font-weight: 750;
+  background: #dff1ee;
+  border: 1px solid #79aaa7;
+  border-radius: 50%;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+}
+
+.radialClose {
+  position: absolute;
+  right: 34px;
+  top: 34px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  color: #42382d;
+  background: #fffdf8;
+  border: 1px solid #d8d0c5;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.settingsPalette {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 5px;
+  margin: 0 0 8px;
+}
+
+.settingsSwatch {
+  width: 20px;
+  height: 20px;
+  justify-self: center;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(71, 59, 42, 0.24);
+  cursor: pointer;
+}
+
+.settingsSwatch.active {
+  box-shadow: 0 0 0 3px #2c7a7b, 0 0 0 5px #fffdf8;
+}
+
+.settingsPanel {
+  position: absolute;
+  left: 50%;
+  top: 88px;
+  width: 248px;
+  padding: 9px;
+  background: rgba(255, 253, 248, 0.92);
+  border: 1px solid #ddd6ca;
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(61, 49, 34, 0.14);
+  transform: translateX(-50%);
+}
+
+.settingsTitle {
+  margin-bottom: 5px;
+  color: #6e6253;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.settingsRange {
+  display: block;
+  margin-bottom: 5px;
+  color: #665d51;
+  font-size: 11px;
+}
+
+.settingsRange input {
+  display: block;
+  height: 16px;
+}
+
+.settingsActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.settingsAction {
+  display: grid;
+  min-width: 0;
+  min-height: 34px;
+  place-items: center;
+  padding: 3px 2px;
+  color: #3d3429;
+  font-size: 10px;
+  background: #fffaf1;
+  border: 1px solid #d9d0c2;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.settingsAction span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settingsAction.active {
+  color: #143f40;
+  background: #dff1ee;
+  border-color: #79aaa7;
+}
+
+.settingsAction:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.wheelSettingsPanel {
+  position: absolute;
+  left: 150px;
+  top: 86px;
+  z-index: 3;
+  display: grid;
+  width: 344px;
+  gap: 12px;
+  padding: 16px 18px 14px;
+  color: #202124;
+  background: rgba(215, 215, 215, 0.96);
+  border: 1px solid rgba(80, 80, 80, 0.22);
+  border-radius: 7px;
+  box-shadow: 0 14px 32px rgba(40, 40, 40, 0.24);
+  backdrop-filter: blur(8px);
+}
+
+.wheelSettingRow {
+  display: grid;
+  gap: 7px;
+}
+
+.wheelSettingTop {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.wheelSettingTop span {
+  color: #313131;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.wheelSettingTop output {
+  min-width: 68px;
+  padding: 4px 8px;
+  color: #2f2f2f;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 2px;
+}
+
+.wheelSettingControl {
+  display: grid;
+  grid-template-columns: 28px 1fr 28px;
+  align-items: center;
+  gap: 10px;
+}
+
+.wheelSettingControl button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  color: #222;
+  font-size: 18px;
+  font-weight: 700;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.wheelSettingControl input {
+  width: 100%;
+  accent-color: #1f1f1f;
+}
+
+.wheelSettingMarks {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  color: #3e3e3e;
+  font-size: 11px;
+  text-align: center;
+}
+
+.wheelSettingsActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.wheelToggle,
+.wheelDanger {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #222;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid rgba(85, 85, 85, 0.22);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.wheelToggle.active {
+  color: #fffdf8;
+  background: #2c7a7b;
+  border-color: #24696a;
+}
+
+.wheelDanger {
+  color: #5c2a22;
+}
+
+.toolAnchor {
+  position: fixed;
+  z-index: 1000;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  color: #ffffff;
+  background: #050505;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+}
+
+.toolAnchor:hover {
+  background: #1f1f1f;
+}
+
+.toolDotIcon {
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.minusIcon {
+  display: inline-block;
+  width: 16px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 99px;
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    grid-template-columns: minmax(92px, auto) 1fr auto;
+  }
+
+  .brandCompact,
+  .noteMeta {
+    display: none;
+  }
+}

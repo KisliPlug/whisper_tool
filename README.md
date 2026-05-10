@@ -93,6 +93,15 @@ hotkey: "f21"
 # Recognition language ("auto", "ru", "en", etc.)
 language: "auto"
 
+# In auto mode, only these languages are allowed. If Whisper detects
+# anything else, it retries with each allowed language and keeps the best score.
+allowed_languages:
+  - "ru"
+  - "en"
+
+# Optional microphone device override (index or name)
+input_device: null
+
 # Whisper model size
 model_size: "medium"
 
@@ -124,6 +133,8 @@ insert_mode: "clipboard"
 |---|---|---|
 | `hotkey` | `"f21"` | Push-to-talk key (see [Supported Hotkeys](#supported-hotkeys)) |
 | `language` | `"auto"` | Language code (`"auto"`, `"ru"`, `"en"`, etc.) |
+| `allowed_languages` | `["ru", "en"]` | Hard allow-list used when `language` is `"auto"` |
+| `input_device` | `null` | Optional microphone device override by index or name |
 | `model_size` | `"medium"` | Whisper model: `tiny`, `base`, `small`, `medium`, `large-v3` |
 | `device` | `"auto"` | `"auto"` / `"cuda"` / `"cpu"` |
 | `compute_type` | `"float16"` | GPU: `float16`, `int8_float16`, `float32`; CPU: `int8`, `float32` |

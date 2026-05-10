@@ -6,10 +6,51 @@
 # Hold to record, release to transcribe & paste.
 hotkey: "f21"
 
+# ── Voice command (push-to-talk) ─────────────
+# Hold to record a command, release to execute.
+# Currently supported: "task kill <name>" — kills processes whose
+# image name contains <name>. See app/commands.py for the alias map
+# and to add new commands.
+command_hotkey: "f19"
+
+# Language forced during command recognition. English ("en") works
+# best even when you say Russian-accented app names because Whisper
+# transliterates them to Latin ("revit", "chrome") — the alias map
+# becomes a fallback, not the primary path.
+command_language: "en"
+
+# ── Focus-steal lock (tap-to-toggle) ─────────
+# Tap once to raise Windows' SPI_SETFOREGROUNDLOCKTIMEOUT so apps
+# like Revit can't yank foreground focus away from you. Tap again
+# to restore the previous timeout. Spec is "mod+mod+…+mainkey";
+# supported mods: ctrl, alt, shift, win.
+focus_lock_hotkey: "ctrl+f17"
+
+# Auto-enable focus lock on startup so background apps cannot steal
+# the foreground until you explicitly turn the protection off.
+focus_lock_auto_enable: true
+
 # Recognition language (ISO 639-1)
-# "auto" = auto-detect (supports mixed Russian/English),
+# "auto" = auto-detect, restricted to allowed_languages below,
 # "ru", "en", etc. = force a specific language.
 language: "auto"
+
+# Hard allow-list for auto language detection. If Whisper detects anything
+# outside this list, the result is discarded and decoded again with each
+# allowed language; the best-scoring allowed result is returned.
+allowed_languages:
+  - "ru"
+  - "en"
+
+# Input device for microphone capture. Null = use Windows default input.
+# You can set either a device index (more reliable on Windows) or a name.
+# Example for Redmi Buds hands-free mic:
+# input_device: 28
+input_device: null
+
+# Keep the input stream open briefly after recording so Bluetooth
+# headsets do not re-negotiate the microphone on every hotkey press.
+input_keepalive_ms: 15000
 
 # Whisper model size
 # Options: tiny, base, small, medium, large-v3
@@ -55,8 +96,13 @@ screen:
 
   # Tap once, select a region on a frozen snapshot of the primary
   # monitor — any open dropdown/menu stays visible in the picker.
-  # Saves a single PNG.
+  # Saves a single PNG immediately, no annotator.
   screenshot_hotkey: "f17"
+
+  # Same as above, but after saving opens an annotator window where
+  # you can draw strokes. Tap this key again to commit & close;
+  # Esc cancels without saving.
+  screenshot_edit_hotkey: "f18"
 
   # Video frames per second (higher = smoother + larger files).
   video_fps: 15

@@ -19,13 +19,27 @@ class Transcriber:
         compute_type: str = "float16",
         beam_size: int = 5,
         language: str = "ru",
+        allowed_languages: list[str] | tuple[str, ...] | None = None,
     ):
         self.model_size = model_size
         self.device = device
         self.compute_type = compute_type
         self.beam_size = beam_size
-        self.language = language
+        self.language = self._normalize_language(language) or "auto"
+        self.allowed_languages = tuple(
+            code for code in (
+                self._normalize_language(item) for item in (allowed_languages or [])
+            )
+            if code and code != "auto"
+        )
         self.model: WhisperModel | None = None
+
+    @staticmethod
+    def _normalize_language(language: str | None) -> str | None:
+        if language is None:
+            return None
+        value = str(language).strip().lower()
+        return value or None
 
     def load_model(self, on_progress=None) -> None:
         """Load the Whisper model. Call this once at startup.
@@ -48,11 +62,14 @@ class Transcriber:
         if on_progress:
             on_progress("Model loaded successfully.")
 
-    def transcribe(self, audio: np.ndarray) -> str:
+    def transcribe(self, audio: np.ndarray, language: str | None = None) -> str:
         """Transcribe a float32 numpy audio array to text.
 
         Args:
             audio: 1D float32 numpy array, 16kHz mono.
+            language: Per-call override (e.g. "en" to force English for
+                a command utterance). `None` uses `self.language`, and
+                `"auto"` (here or in the default) disables forcing.
 
         Returns:
             Transcribed text string (may be empty if nothing recognized).
@@ -60,9 +77,47 @@ class Transcriber:
         if self.model is None:
             raise RuntimeError("Model not loaded. Call load_model() first.")
 
+        effective = self._normalize_language(language) or self.language
+        if effective == "auto" and self.allowed_languages:
+            text, detected_language, _ = self._transcribe_once(audio, language=None)
+            detected_language = self._normalize_language(detected_language)
+            if detected_language in self.allowed_languages:
+                return text
+
+            # Whisper can mis-detect short Russian/English utterances as
+            # Spanish, Portuguese, etc. In restricted auto mode, never return
+            # text decoded under a language outside the allow-list.
+            return self._transcribe_best_allowed(audio)
+
+        text, _, _ = self._transcribe_once(
+            audio,
+            language=effective if effective != "auto" else None,
+        )
+        return text
+
+    def _transcribe_best_allowed(self, audio: np.ndarray) -> str:
+        best_text = ""
+        best_score = float("-inf")
+
+        for allowed_language in self.allowed_languages:
+            text, _, score = self._transcribe_once(audio, language=allowed_language)
+            if text and (score > best_score or not best_text):
+                best_text = text
+                best_score = score
+
+        return best_text
+
+    def _transcribe_once(
+        self,
+        audio: np.ndarray,
+        language: str | None,
+    ) -> tuple[str, str | None, float]:
+        if self.model is None:
+            raise RuntimeError("Model not loaded. Call load_model() first.")
+
         segments, info = self.model.transcribe(
             audio,
-            language=self.language if self.language != "auto" else None,
+            language=language,
             beam_size=self.beam_size,
             vad_filter=True,
             vad_parameters=dict(
@@ -75,9 +130,14 @@ class Transcriber:
 
         # Collect all segment texts
         parts = []
+        scores = []
         for segment in segments:
             text = segment.text.strip()
             if text:
                 parts.append(text)
+            avg_logprob = getattr(segment, "avg_logprob", None)
+            if avg_logprob is not None:
+                scores.append(float(avg_logprob))
 
-        return " ".join(parts)
+        score = sum(scores) / len(scores) if scores else float("-inf")
+        return " ".join(parts), getattr(info, "language", None), score

@@ -8,7 +8,14 @@ import yaml
 
 VOICE_DEFAULTS = {
     "hotkey": "f21",
+    "command_hotkey": "f19",
+    "command_language": "en",
+    "focus_lock_hotkey": "ctrl+f17",
+    "focus_lock_auto_enable": False,
     "language": "auto",
+    "allowed_languages": ["ru", "en"],
+    "input_device": None,
+    "input_keepalive_ms": 15000,
     "model_size": "medium",
     "device": "auto",
     "compute_type": "float16",
@@ -24,6 +31,7 @@ SCREEN_DEFAULTS = {
     "enabled": True,
     "video_hotkey": "f20",
     "screenshot_hotkey": "f17",
+    "screenshot_edit_hotkey": "f18",
     "video_fps": 15,
     "output_dir": "~/Documents/records",
 }
@@ -34,6 +42,7 @@ class ScreenConfig:
     enabled: bool = SCREEN_DEFAULTS["enabled"]
     video_hotkey: str = SCREEN_DEFAULTS["video_hotkey"]
     screenshot_hotkey: str = SCREEN_DEFAULTS["screenshot_hotkey"]
+    screenshot_edit_hotkey: str = SCREEN_DEFAULTS["screenshot_edit_hotkey"]
     video_fps: int = SCREEN_DEFAULTS["video_fps"]
     output_dir: str = SCREEN_DEFAULTS["output_dir"]
 
@@ -41,7 +50,14 @@ class ScreenConfig:
 @dataclass
 class Config:
     hotkey: str = VOICE_DEFAULTS["hotkey"]
+    command_hotkey: str = VOICE_DEFAULTS["command_hotkey"]
+    command_language: str = VOICE_DEFAULTS["command_language"]
+    focus_lock_hotkey: str = VOICE_DEFAULTS["focus_lock_hotkey"]
+    focus_lock_auto_enable: bool = VOICE_DEFAULTS["focus_lock_auto_enable"]
     language: str = VOICE_DEFAULTS["language"]
+    allowed_languages: list[str] = field(default_factory=lambda: list(VOICE_DEFAULTS["allowed_languages"]))
+    input_device: str | int | None = VOICE_DEFAULTS["input_device"]
+    input_keepalive_ms: int = VOICE_DEFAULTS["input_keepalive_ms"]
     model_size: str = VOICE_DEFAULTS["model_size"]
     device: str = VOICE_DEFAULTS["device"]
     compute_type: str = VOICE_DEFAULTS["compute_type"]
@@ -62,6 +78,7 @@ class Config:
                 data = yaml.safe_load(f) or {}
 
         screen_raw = data.pop("screen", None) or {}
+        data.pop("agent_status", None)
         voice_merged = {**VOICE_DEFAULTS, **data}
         screen_merged = {**SCREEN_DEFAULTS, **screen_raw}
 
@@ -73,7 +90,10 @@ class Config:
             k: v for k, v in screen_merged.items()
             if k in ScreenConfig.__dataclass_fields__
         }
-        return cls(**voice_fields, screen=ScreenConfig(**screen_fields))
+        return cls(
+            **voice_fields,
+            screen=ScreenConfig(**screen_fields),
+        )
 
     @property
     def effective_device(self) -> str:
