@@ -1,112 +1,91 @@
 # ============================================
-# Whisper Voice Input + Screen Capture — Config
+# Whisper Screen Tools - config
 # ============================================
 
-# ── Voice typing (push-to-talk) ──────────────
-# Hold to record, release to transcribe & paste.
+# Voice typing. Hold to record, release to transcribe and paste.
 hotkey: "f21"
 
-# ── Voice command (push-to-talk) ─────────────
-# Hold to record a command, release to execute.
-# Currently supported: "task kill <name>" — kills processes whose
-# image name contains <name>. See app/commands.py for the alias map
-# and to add new commands.
+# Voice command. Hold to record a command, release to execute it.
+# Currently supported: "task kill <name>".
+# See app/commands.py for aliases and command parser logic.
 command_hotkey: "f19"
 
-# Language forced during command recognition. English ("en") works
-# best even when you say Russian-accented app names because Whisper
-# transliterates them to Latin ("revit", "chrome") — the alias map
-# becomes a fallback, not the primary path.
+# Language forced during command recognition.
+# English usually works best for app/process names.
 command_language: "en"
 
-# ── Focus-steal lock (tap-to-toggle) ─────────
-# Tap once to raise Windows' SPI_SETFOREGROUNDLOCKTIMEOUT so apps
-# like Revit can't yank foreground focus away from you. Tap again
-# to restore the previous timeout. Spec is "mod+mod+…+mainkey";
-# supported mods: ctrl, alt, shift, win.
+# Focus-steal lock. Tap once to block foreground focus stealing;
+# tap again to restore the previous Windows timeout.
 focus_lock_hotkey: "ctrl+f17"
 
-# Auto-enable focus lock on startup so background apps cannot steal
-# the foreground until you explicitly turn the protection off.
+# Auto-enable focus lock on startup.
 focus_lock_auto_enable: true
 
-# Recognition language (ISO 639-1)
-# "auto" = auto-detect, restricted to allowed_languages below,
-# "ru", "en", etc. = force a specific language.
+# Voice recognition language.
+# "auto" = auto-detect, restricted to allowed_languages below.
 language: "auto"
 
-# Hard allow-list for auto language detection. If Whisper detects anything
-# outside this list, the result is discarded and decoded again with each
-# allowed language; the best-scoring allowed result is returned.
+# Hard allow-list for auto language detection.
 allowed_languages:
   - "ru"
   - "en"
 
-# Input device for microphone capture. Null = use Windows default input.
-# You can set either a device index (more reliable on Windows) or a name.
-# Example for Redmi Buds hands-free mic:
-# input_device: 28
+# Optional microphone input device override.
+# Use null for the Windows default input device.
 input_device: null
 
 # Keep the input stream open briefly after recording so Bluetooth
-# headsets do not re-negotiate the microphone on every hotkey press.
+# microphones do not renegotiate on every hotkey press.
 input_keepalive_ms: 15000
 
-# Whisper model size
-# Options: tiny, base, small, medium, large-v3
-# Larger = better quality, more VRAM, slower first load
+# Whisper model size: tiny, base, small, medium, large-v3.
 model_size: "medium"
 
-# Compute device: "auto", "cuda", "cpu"
+# Compute device: auto, cuda, cpu.
 device: "auto"
 
-# Compute precision
-# GPU: "float16" (fast, recommended), "int8_float16", "float32"
-# CPU: "int8" (fast), "float32"
+# Compute precision.
+# GPU: float16, int8_float16, float32.
+# CPU: int8, float32.
 compute_type: "float16"
 
-# Beam size for decoding (higher = better quality, slower)
+# Beam search width. Higher is usually better and slower.
 beam_size: 5
 
-# Audio sample rate in Hz (16000 is optimal for Whisper)
+# Audio sample rate in Hz. Whisper expects 16000.
 sample_rate: 16000
 
-# Minimum recording duration in seconds (skips accidental taps)
+# Minimum recording duration in seconds.
 min_duration: 0.5
 
-# Streaming transcription interval in seconds
+# Streaming transcription interval in seconds.
 stream_interval: 2.0
 
-# Beep on recording start/stop
+# Beep on recording start/stop.
 sound_feedback: true
 
-# Text insertion method: "clipboard" (Shift+Insert) or "typing"
+# Text insertion method: clipboard or typing.
 insert_mode: "clipboard"
 
 
-# ── Screen capture ───────────────────────────
-# Independent hotkeys for video (toggle) and screenshot (tap).
-# Must not collide with the voice hotkey above.
+# Screen capture tools.
 screen:
   enabled: true
 
-  # Tap once to pick a region and start recording, tap again to stop.
-  # Saves GIF + MP4 + labeled PNG frame grid into its own folder.
+  # Tap once to select a region and start recording.
+  # Tap again to stop. Saves GIF, MP4, and frames.png.
   video_hotkey: "f20"
 
-  # Tap once, select a region on a frozen snapshot of the primary
-  # monitor — any open dropdown/menu stays visible in the picker.
-  # Saves a single PNG immediately, no annotator.
+  # Tap once, select a region on a frozen snapshot, save PNG.
   screenshot_hotkey: "f17"
 
-  # Same as above, but after saving opens an annotator window where
-  # you can draw strokes. Tap this key again to commit & close;
-  # Esc cancels without saving.
+  # Tap once, select a region, open the image annotator.
+  # Tap again while the annotator is open to commit and close.
   screenshot_edit_hotkey: "f18"
 
-  # Video frames per second (higher = smoother + larger files).
+  # Video frame rate.
   video_fps: 15
 
-  # Where all captures go. Each capture gets its own timestamped
-  # subfolder; activity.log lives directly in output_dir.
+  # Output root. Every capture gets a timestamped subfolder.
+  # activity.log lives directly in this directory.
   output_dir: "~/Documents/records"
