@@ -164,38 +164,54 @@ function hitTest(item, point) {
   return box ? pointInBox(point, box, 5) : false;
 }
 
+function preserveLiveText(target, current) {
+  const next = structuredClone(target);
+  next.notes = next.notes.map((note) => {
+    const live = current.notes.find((n) => n.id === note.id);
+    return live ? { ...note, text: live.text, name: live.name } : note;
+  });
+  next.items = next.items.map((item) => {
+    if (item.type !== "text") return item;
+    const live = current.items.find((i) => i.id === item.id);
+    return live ? { ...item, text: live.text } : item;
+  });
+  return next;
+}
+
 function useHistory(initial) {
   const [state, setState] = useState(initial);
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
 
+  const pushSnapshot = (snapshot) => {
+    setUndoStack((stack) => [...stack.slice(-79), structuredClone(snapshot)]);
+    setRedoStack([]);
+  };
+
   const commit = (updater) => {
     setState((current) => {
-      setUndoStack((stack) => [...stack.slice(-80), structuredClone(current)]);
-      setRedoStack([]);
+      pushSnapshot(current);
       return typeof updater === "function" ? updater(structuredClone(current)) : updater;
     });
   };
 
   const undo = () => {
-    setUndoStack((stack) => {
-      if (!stack.length) return stack;
-      setRedoStack((redo) => [structuredClone(state), ...redo]);
-      setState(stack[stack.length - 1]);
-      return stack.slice(0, -1);
-    });
+    if (!undoStack.length) return;
+    const target = preserveLiveText(undoStack[undoStack.length - 1], state);
+    setRedoStack((redo) => [structuredClone(state), ...redo]);
+    setUndoStack((stack) => stack.slice(0, -1));
+    setState(target);
   };
 
   const redo = () => {
-    setRedoStack((stack) => {
-      if (!stack.length) return stack;
-      setUndoStack((undoItems) => [...undoItems, structuredClone(state)]);
-      setState(stack[0]);
-      return stack.slice(1);
-    });
+    if (!redoStack.length) return;
+    const target = preserveLiveText(redoStack[0], state);
+    setUndoStack((undoItems) => [...undoItems, structuredClone(state)]);
+    setRedoStack((stack) => stack.slice(1));
+    setState(target);
   };
 
-  return { state, setState, commit, undo, redo, canUndo: undoStack.length > 0, canRedo: redoStack.length > 0 };
+  return { state, setState, commit, undo, redo, pushSnapshot, canUndo: undoStack.length > 0, canRedo: redoStack.length > 0 };
 }
 
 export default function App() {
@@ -218,6 +234,7 @@ export default function App() {
   const scrollerRef = useRef(null);
   const stageRef = useRef(null);
   const imgRef = useRef(null);
+  const dragMovedRef = useRef(false);
 
   const {
     state,
@@ -225,6 +242,7 @@ export default function App() {
     commit,
     undo,
     redo,
+    pushSnapshot,
     canUndo,
     canRedo
   } = useHistory({ notes: [{ id: 1, text: "" }], activeNoteId: 1, items: [] });
@@ -282,25 +300,32 @@ export default function App() {
   useEffect(() => {
     const onKey = (e) => {
       const activeElement = document.activeElement;
-      const editingText = activeElement?.classList?.contains("inlineText") || ["INPUT", "TEXTAREA"].includes(activeElement?.tagName);
+      const isTextField = activeElement?.classList?.contains("inlineText") || ["INPUT", "TEXTAREA"].includes(activeElement?.tagName);
       const key = e.key.toLowerCase();
       const shortcut = e.ctrlKey || e.metaKey;
-      const textNativeShortcut = shortcut && ["a", "c", "x", "v"].includes(key);
-      if (e.ctrlKey && e.key.toLowerCase() === "z") {
+      const textSelectionLength = isTextField && activeElement.selectionStart != null
+        ? Math.abs((activeElement.selectionEnd || 0) - (activeElement.selectionStart || 0))
+        : 0;
+      if (shortcut && (key === "z" || key === "y")) {
+        if (isTextField) return;
         e.preventDefault();
-        undo();
-      } else if (e.ctrlKey && e.key.toLowerCase() === "y") {
+        if (key === "z") undo(); else redo();
+      } else if (shortcut && key === "a") {
+        if (isTextField) return;
         e.preventDefault();
-        redo();
-      } else if (editingText && textNativeShortcut) {
-        return;
       } else if (shortcut && key === "c") {
+        if (isTextField && textSelectionLength > 0) return;
+        if (!selectedIds.length) return;
         e.preventDefault();
         copySelected();
       } else if (shortcut && key === "x") {
+        if (isTextField && textSelectionLength > 0) return;
+        if (!selectedIds.length) return;
         e.preventDefault();
         cutSelected();
       } else if (shortcut && key === "v") {
+        if (isTextField) return;
+        if (!clipboardItems.length) return;
         e.preventDefault();
         pasteClipboard();
       } else if (shortcut && (e.key === "+" || e.key === "=")) {
@@ -312,7 +337,7 @@ export default function App() {
       } else if (shortcut && e.key === "0") {
         e.preventDefault();
         setZoom(1);
-      } else if (editingText) {
+      } else if (isTextField) {
         return;
       } else if (e.key === "Delete" || e.key === "Backspace") {
         deleteSelected();
@@ -404,18 +429,20 @@ export default function App() {
   };
 
   const updateActiveNoteText = (text) => {
-    commit((s) => {
-      const note = s.notes.find((n) => n.id === s.activeNoteId);
+    setState((s) => {
+      const copy = structuredClone(s);
+      const note = copy.notes.find((n) => n.id === copy.activeNoteId);
       if (note) note.text = text;
-      return s;
+      return copy;
     });
   };
 
   const updateActiveNoteName = (name) => {
-    commit((s) => {
-      const note = s.notes.find((n) => n.id === s.activeNoteId);
+    setState((s) => {
+      const copy = structuredClone(s);
+      const note = copy.notes.find((n) => n.id === copy.activeNoteId);
       if (note) note.name = name || `Note ${note.id}`;
-      return s;
+      return copy;
     });
   };
 
@@ -425,6 +452,16 @@ export default function App() {
   };
 
   const updateItem = (id, patch) => {
+    const isTextOnly = Object.keys(patch).length === 1 && "text" in patch;
+    if (isTextOnly) {
+      setState((s) => {
+        const copy = structuredClone(s);
+        const item = copy.items.find((i) => i.id === id);
+        if (item) item.text = patch.text;
+        return copy;
+      });
+      return;
+    }
     commit((s) => {
       const item = s.items.find((i) => i.id === id);
       if (item) Object.assign(item, patch);
@@ -519,18 +556,26 @@ export default function App() {
     if (tool === "select") {
       const handle = selected ? handleAt(selected, point) : null;
       if (handle) {
-        commit((s) => s);
-        setDrag({ mode: "resize", id: selected.id, handle, start: point, original: structuredClone(selected) });
+        dragMovedRef.current = false;
+        setDrag({
+          mode: "resize",
+          id: selected.id,
+          handle,
+          start: point,
+          original: structuredClone(selected),
+          preSnapshot: structuredClone(state)
+        });
         return;
       }
       const selectionBox = combinedBox(selectedItems);
       if (!e.shiftKey && selectedItems.length && selectionBox && pointInBox(point, selectionBox, 8)) {
-        commit((s) => s);
+        dragMovedRef.current = false;
         setDrag({
           mode: "move",
           ids: [...selectedIds],
           start: point,
-          originals: structuredClone(selectedItems)
+          originals: structuredClone(selectedItems),
+          preSnapshot: structuredClone(state)
         });
         return;
       }
@@ -545,12 +590,13 @@ export default function App() {
           nextIds = selectedIds.includes(hit.id) ? selectedIds : [hit.id];
         }
         setSelectedIds(nextIds);
-        commit((s) => s);
+        dragMovedRef.current = false;
         setDrag({
           mode: "move",
           ids: nextIds,
           start: point,
-          originals: structuredClone(state.items.filter((item) => nextIds.includes(item.id)))
+          originals: structuredClone(state.items.filter((item) => nextIds.includes(item.id))),
+          preSnapshot: structuredClone(state)
         });
       } else {
         if (!e.shiftKey) setSelectedIds([]);
@@ -577,6 +623,7 @@ export default function App() {
     }
     const point = toImagePoint(e, { noSnap: draft?.type === "pen" });
     if (drag?.mode === "resize") {
+      dragMovedRef.current = true;
       const resized = resizeItem(drag.original, drag.handle, point);
       setState((s) => ({
         ...s,
@@ -587,6 +634,7 @@ export default function App() {
     if (drag?.mode === "move") {
       const dx = point.x - drag.start.x;
       const dy = point.y - drag.start.y;
+      if (dx !== 0 || dy !== 0) dragMovedRef.current = true;
       const moved = new Map(
         drag.originals.map((item) => [item.id, offsetItem(structuredClone(item), dx, dy)])
       );
@@ -614,10 +662,14 @@ export default function App() {
       return;
     }
     if (drag?.mode === "resize") {
+      if (dragMovedRef.current && drag.preSnapshot) pushSnapshot(drag.preSnapshot);
+      dragMovedRef.current = false;
       setDrag(null);
       return;
     }
     if (drag?.mode === "move") {
+      if (dragMovedRef.current && drag.preSnapshot) pushSnapshot(drag.preSnapshot);
+      dragMovedRef.current = false;
       setDrag(null);
       return;
     }
