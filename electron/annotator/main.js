@@ -1,7 +1,7 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, clipboard, ipcMain, Menu, nativeImage } from "electron";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,8 +12,12 @@ if (!sessionDir) {
   app.exit(2);
 }
 
+app.setName("Whisper Screenshot Annotator");
+Menu.setApplicationMenu(null);
+
 const requestPath = path.join(sessionDir, "request.json");
 const resultPath = path.join(sessionDir, "result.json");
+const WINDOW_TITLE = "Whisper Screenshot Annotator";
 
 async function createWindow() {
   const request = JSON.parse(await fs.readFile(requestPath, "utf8"));
@@ -22,14 +26,28 @@ async function createWindow() {
     height: Math.min(1100, Math.max(760, request.size.height + 170)),
     minWidth: 980,
     minHeight: 680,
-    title: "Annotate screenshot",
+    title: WINDOW_TITLE,
     backgroundColor: "#101114",
     autoHideMenuBar: true,
+    alwaysOnTop: true,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false
     }
+  });
+
+  win.setAlwaysOnTop(true);
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  win.on("page-title-updated", (event) => {
+    event.preventDefault();
+    win.setTitle(WINDOW_TITLE);
+  });
+  win.once("ready-to-show", () => {
+    win.show();
+    win.focus();
+    win.setAlwaysOnTop(true);
   });
 
   if (process.env.ANNOTATOR_DEV_URL) {
@@ -44,7 +62,7 @@ ipcMain.handle("annotator:load", async () => {
   return {
     ...request,
     sessionDir,
-    imageUrl: `file://${request.imagePath.replaceAll("\\", "/")}`,
+    imageUrl: pathToFileURL(request.imagePath).href,
     commitPath: path.join(sessionDir, "commit"),
     cancelPath: path.join(sessionDir, "cancel")
   };
@@ -64,13 +82,22 @@ ipcMain.handle("annotator:checkSignal", async () => {
 
 ipcMain.handle("annotator:save", async (_event, payload) => {
   const imageBuffer = Buffer.from(payload.imageBase64, "base64");
+  let clipboardImage = false;
+  if (payload.copyImageToClipboard) {
+    clipboard.writeImage(nativeImage.createFromBuffer(imageBuffer));
+    clipboardImage = true;
+  }
   await fs.writeFile(path.join(sessionDir, "output.png"), imageBuffer);
   await fs.writeFile(
     path.join(sessionDir, "annotations.json"),
     JSON.stringify(payload.metadata, null, 2),
     "utf8"
   );
-  await fs.writeFile(resultPath, JSON.stringify({ ok: true }, null, 2), "utf8");
+  await fs.writeFile(
+    resultPath,
+    JSON.stringify({ ok: true, clipboardImage }, null, 2),
+    "utf8"
+  );
   app.exit(0);
 });
 

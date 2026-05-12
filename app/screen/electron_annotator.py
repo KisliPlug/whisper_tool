@@ -109,4 +109,8 @@ def annotate_image(root, image_np, event_queue, commit_event="shot_edit"):
 
         annotated = np.array(Image.open(output_path).convert("RGB"))
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        return {"image": annotated, "metadata": metadata}
+        return {
+            "image": annotated,
+            "metadata": metadata,
+            "clipboard_image": bool(result.get("clipboardImage")),
+        }

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
   Circle,
+  Clipboard,
   Eraser,
   Grid3X3,
   MousePointer2,
@@ -54,6 +55,10 @@ const TOOL_SHORTCUTS = {
 
 const TOOL_BY_SHORTCUT = Object.fromEntries(
   Object.entries(TOOL_SHORTCUTS).map(([toolName, key]) => [key.toLowerCase(), toolName])
+);
+
+const TOOL_BY_CODE = Object.fromEntries(
+  Object.entries(TOOL_SHORTCUTS).map(([toolName, key]) => [`Key${key}`, toolName])
 );
 
 const RADIAL_TOOLS = [
@@ -277,32 +282,38 @@ export default function App() {
   useEffect(() => {
     const onKey = (e) => {
       const activeElement = document.activeElement;
-      const editing = activeElement?.classList?.contains("inlineText") || ["INPUT", "TEXTAREA"].includes(activeElement?.tagName);
-      if (editing) return;
+      const editingText = activeElement?.classList?.contains("inlineText") || ["INPUT", "TEXTAREA"].includes(activeElement?.tagName);
+      const key = e.key.toLowerCase();
+      const shortcut = e.ctrlKey || e.metaKey;
+      const textNativeShortcut = shortcut && ["a", "c", "x", "v"].includes(key);
       if (e.ctrlKey && e.key.toLowerCase() === "z") {
         e.preventDefault();
         undo();
       } else if (e.ctrlKey && e.key.toLowerCase() === "y") {
         e.preventDefault();
         redo();
-      } else if (e.ctrlKey && e.key.toLowerCase() === "c") {
+      } else if (editingText && textNativeShortcut) {
+        return;
+      } else if (shortcut && key === "c") {
         e.preventDefault();
         copySelected();
-      } else if (e.ctrlKey && e.key.toLowerCase() === "x") {
+      } else if (shortcut && key === "x") {
         e.preventDefault();
         cutSelected();
-      } else if (e.ctrlKey && e.key.toLowerCase() === "v") {
+      } else if (shortcut && key === "v") {
         e.preventDefault();
         pasteClipboard();
-      } else if ((e.ctrlKey || e.metaKey) && (e.key === "+" || e.key === "=")) {
+      } else if (shortcut && (e.key === "+" || e.key === "=")) {
         e.preventDefault();
         zoomBy(1.2);
-      } else if ((e.ctrlKey || e.metaKey) && e.key === "-") {
+      } else if (shortcut && e.key === "-") {
         e.preventDefault();
         zoomBy(1 / 1.2);
-      } else if ((e.ctrlKey || e.metaKey) && e.key === "0") {
+      } else if (shortcut && e.key === "0") {
         e.preventDefault();
         setZoom(1);
+      } else if (editingText) {
+        return;
       } else if (e.key === "Delete" || e.key === "Backspace") {
         deleteSelected();
       } else if (e.key === "Escape") {
@@ -314,7 +325,7 @@ export default function App() {
           toggleWheel();
           return;
         }
-        const nextTool = TOOL_BY_SHORTCUT[e.key.toLowerCase()];
+        const nextTool = TOOL_BY_SHORTCUT[e.key.toLowerCase()] || TOOL_BY_CODE[e.code];
         if (nextTool) {
           e.preventDefault();
           setTool(nextTool);
@@ -322,8 +333,8 @@ export default function App() {
         }
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
   });
 
   useEffect(() => {
@@ -486,6 +497,7 @@ export default function App() {
 
   const onPointerDown = (e) => {
     if (!request) return;
+    stageRef.current?.focus({ preventScroll: true });
     if (e.button === 2) {
       e.preventDefault();
       return;
@@ -636,7 +648,7 @@ export default function App() {
     }
   };
 
-  const save = async () => {
+  const save = async ({ copyImageToClipboard = false } = {}) => {
     if (!request || !imgRef.current) return;
     const canvas = document.createElement("canvas");
     canvas.width = request.size.width;
@@ -647,7 +659,8 @@ export default function App() {
     const imageBase64 = canvas.toDataURL("image/png").split(",")[1];
     await window.annotatorApi.save({
       imageBase64,
-      metadata: buildMetadata(state, request.size)
+      metadata: buildMetadata(state, request.size),
+      copyImageToClipboard
     });
   };
 
@@ -714,7 +727,10 @@ export default function App() {
               {TOOL_LABELS[tool]}
             </button>
             <button className="ghostButton" onClick={() => window.annotatorApi.cancel()}><X size={16} /> Cancel</button>
-            <button className="saveButton" onClick={save}><Save size={16} /> Save</button>
+            <button className="clipboardButton" onClick={() => save({ copyImageToClipboard: true })}>
+              <Clipboard size={16} /> Save to Clipboard
+            </button>
+            <button className="saveButton" onClick={() => save()}><Save size={16} /> Save</button>
           </div>
         </header>
 
@@ -740,6 +756,7 @@ export default function App() {
             onPointerLeave={() => {
               if (!wheel) onPointerUp();
             }}
+            tabIndex={0}
           >
             <img ref={imgRef} className="baseImage" src={request.imageUrl} draggable={false} />
             {snap && <GridOverlay width={request.size.width} height={request.size.height} size={gridSize} />}

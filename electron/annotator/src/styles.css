@@ -106,6 +106,7 @@ button {
 
 .wideButton,
 .ghostButton,
+.clipboardButton,
 .saveButton,
 .noteAdd,
 .iconButton,
@@ -121,6 +122,7 @@ button {
 
 .wideButton:hover,
 .ghostButton:hover,
+.clipboardButton:hover,
 .saveButton:hover,
 .noteAdd:hover,
 .iconButton:hover,
@@ -316,6 +318,7 @@ input[type="range"] {
 }
 
 .ghostButton,
+.clipboardButton,
 .saveButton,
 .toolPill {
   display: flex;
@@ -332,6 +335,21 @@ input[type="range"] {
   border: 1px solid #79aaa7;
   border-radius: 7px;
   cursor: pointer;
+}
+
+.clipboardButton {
+  color: #163f57;
+  font-weight: 700;
+  background: #e5f2f8;
+  border: 1px solid #8bb6c8;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.clipboardButton:hover {
+  color: #12384d;
+  background: #d8ebf4;
+  border-color: #6fa5bd;
 }
 
 .saveButton {
@@ -367,6 +385,10 @@ input[type="range"] {
   background: #fdfbf6;
   box-shadow: 0 18px 48px rgba(64, 52, 36, 0.26);
   user-select: none;
+}
+
+.stage:focus {
+  outline: none;
 }
 
 .stage.tool-select {

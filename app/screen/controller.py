@@ -322,10 +322,12 @@ class ScreenController:
                 return
             save_array = annotation_result["image"]
             annotation_metadata = annotation_result["metadata"]
+            copied_image_to_clipboard = bool(annotation_result.get("clipboard_image"))
             out_prefix = "screenshot_edited_"
         else:
             save_array = cropped
             annotation_metadata = None
+            copied_image_to_clipboard = False
             out_prefix = "screenshot_"
 
         out_dir = self.output_dir / (out_prefix + datetime.now().strftime("%Y%m%d_%H%M%S"))
@@ -351,11 +353,14 @@ class ScreenController:
         clip_note = ""
         clip_error = None
         clipboard_path = out_dir if edit else png_path
-        try:
-            pyperclip.copy(str(clipboard_path))
-        except Exception as e:
-            clip_error = str(e)
-            clip_note = f" (clipboard failed: {e})"
+        if copied_image_to_clipboard:
+            clip_note = " (image copied to clipboard)"
+        else:
+            try:
+                pyperclip.copy(str(clipboard_path))
+            except Exception as e:
+                clip_error = str(e)
+                clip_note = f" (clipboard failed: {e})"
         self.log.info(
             "SHOT_SAVED   | mode=%s region=%dx%d file=%s clipboard=%s%s",
             mode, region[2], region[3], png_path, clipboard_path, clip_note,
@@ -372,11 +377,14 @@ class ScreenController:
                 subject=str(subject_path),
             )
         else:
-            detail = (
-                "Image and annotations JSON saved. Folder path copied to clipboard."
-                if edit
-                else "Image saved. File path copied to clipboard."
-            )
+            if copied_image_to_clipboard:
+                detail = "Image and annotations JSON saved. Edited image copied to clipboard."
+            else:
+                detail = (
+                    "Image and annotations JSON saved. Folder path copied to clipboard."
+                    if edit
+                    else "Image saved. File path copied to clipboard."
+                )
             self._notify(
                 title=f"{shot_name} Saved",
                 message=detail,
